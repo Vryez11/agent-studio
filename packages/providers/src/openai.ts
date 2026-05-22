@@ -7,10 +7,23 @@ import type {
 } from '@agent-studio/shared';
 
 export class OpenAIProvider implements StageProvider {
-  private client: OpenAI;
+  private explicitApiKey?: string;
+  private _client: OpenAI | null = null;
 
   constructor(apiKey?: string) {
-    this.client = new OpenAI({ apiKey: apiKey ?? process.env.OPENAI_API_KEY });
+    this.explicitApiKey = apiKey;
+  }
+
+  private get client(): OpenAI {
+    if (this._client) return this._client;
+    const apiKey = this.explicitApiKey ?? process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        'OPENAI_API_KEY가 설정되지 않았습니다. apps/api/.env에 추가하고 API 서버를 재시작하세요.',
+      );
+    }
+    this._client = new OpenAI({ apiKey });
+    return this._client;
   }
 
   async *stream(

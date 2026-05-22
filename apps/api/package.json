@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
-    "seed:ideation": "tsx prisma/seed-ideation.ts"
+    "seed:ideation": "tsx prisma/seed-ideation.ts",
+    "seed:ideation-cheap": "tsx prisma/seed-ideation-cheap.ts"
   },
   "dependencies": {
     "@agent-studio/providers": "workspace:*",

@@ -9,10 +9,23 @@ import type {
 const OPUS_4_7_PREFIX = 'claude-opus-4-7';
 
 export class AnthropicProvider implements StageProvider {
-  private client: Anthropic;
+  private explicitApiKey?: string;
+  private _client: Anthropic | null = null;
 
   constructor(apiKey?: string) {
-    this.client = new Anthropic({ apiKey: apiKey ?? process.env.ANTHROPIC_API_KEY });
+    this.explicitApiKey = apiKey;
+  }
+
+  private get client(): Anthropic {
+    if (this._client) return this._client;
+    const apiKey = this.explicitApiKey ?? process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        'ANTHROPIC_API_KEY가 설정되지 않았습니다. apps/api/.env에 추가하고 API 서버를 재시작하세요.',
+      );
+    }
+    this._client = new Anthropic({ apiKey });
+    return this._client;
   }
 
   async *stream(
