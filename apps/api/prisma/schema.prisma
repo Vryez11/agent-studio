@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Agent: 정의의 컨테이너 (mutable)
+// ─────────────────────────────────────────────────────────────────────
+model Agent {
+  id               String   @id @default(uuid()) @db.Char(36)
+  slug             String   @unique
+  name             String
+  description      String?  @db.Text
+  currentVersionId String?  @unique @db.Char(36)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  versions       AgentVersion[] @relation("AgentVersions")
+  currentVersion AgentVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  runs           Run[]
+
+  @@map("agents")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// AgentVersion: 정의의 불변 스냅샷 (프롬프트 수정 시 새 row)
+// ─────────────────────────────────────────────────────────────────────
+model AgentVersion {
+  id            String   @id @default(uuid()) @db.Char(36)
+  agentId       String   @db.Char(36)
+  version       Int
+  stages        Json // StageDefinition[]
+  contextSchema Json?
+  createdAt     DateTime @default(now())
+
+  agent           Agent  @relation("AgentVersions", fields: [agentId], references: [id], onDelete: Cascade)
+  currentForAgent Agent? @relation("CurrentVersion")
+  runs            Run[]
+
+  @@unique([agentId, version])
+  @@map("agent_versions")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Run: Agent 한 번의 실행
+// ─────────────────────────────────────────────────────────────────────
+model Run {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  agentId              String    @db.Char(36)
+  agentVersionId       String    @db.Char(36)
+  status               RunStatus
+  initialInput         Json
+  currentStageIndex    Int?
+  totalInputTokens     Int       @default(0)
+  totalOutputTokens    Int       @default(0)
+  totalCacheReadTokens Int       @default(0)
+  totalCostUsd         Decimal   @default(0) @db.Decimal(10, 6)
+  error                String?   @db.Text
+  startedAt            DateTime?
+  endedAt              DateTime?
+  createdAt            DateTime  @default(now())
+
+  agent        Agent         @relation(fields: [agentId], references: [id])
+  agentVersion AgentVersion  @relation(fields: [agentVersionId], references: [id])
+  stageResults StageResult[]
+
+  @@index([agentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("runs")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// StageResult: Run 안의 각 단계 실행 결과
+// ─────────────────────────────────────────────────────────────────────
+model StageResult {
+  id                  String      @id @default(uuid()) @db.Char(36)
+  runId               String      @db.Char(36)
+  stageId             String
+  stageIndex          Int
+  status              StageStatus
+  model               String?
+  provider            String?
+  resolvedPrompt      Json?
+  outputText          String?     @db.LongText
+  outputStructured    Json?
+  inputTokens         Int?
+  outputTokens        Int?
+  cacheReadTokens     Int?
+  cacheCreationTokens Int?
+  costUsd             Decimal?    @db.Decimal(10, 6)
+  stopReason          String?
+  error               String?     @db.Text
+  startedAt           DateTime?
+  endedAt             DateTime?
+  durationMs          Int?
+
+  run    Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  events StageEvent[]
+
+  @@unique([runId, stageIndex])
+  @@index([runId])
+  @@map("stage_results")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// StageEvent: 스트림 이벤트 (옵션, 디버깅/재생용)
+// ─────────────────────────────────────────────────────────────────────
+model StageEvent {
+  id            BigInt   @id @default(autoincrement())
+  stageResultId String   @db.Char(36)
+  seq           Int
+  eventType     String
+  payload       Json
+  createdAt     DateTime @default(now())
+
+  stageResult StageResult @relation(fields: [stageResultId], references: [id], onDelete: Cascade)
+
+  @@unique([stageResultId, seq])
+  @@map("stage_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────
+enum RunStatus {
+  pending
+  running
+  completed
+  cancelled
+  failed
+}
+
+enum StageStatus {
+  pending
+  running
+  completed
+  cancelled
+  failed
+  skipped
+}
