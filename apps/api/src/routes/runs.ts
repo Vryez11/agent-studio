@@ -73,41 +73,49 @@ export async function registerRunRoutes(app: FastifyInstance) {
   // SSE 스트림
   app.get<{ Params: { id: string } }>('/:id/stream', async (req, reply) => {
     const runId = req.params.id;
-    reply.raw.setHeader('Content-Type', 'text/event-stream');
-    reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
-    reply.raw.setHeader('Connection', 'keep-alive');
-    reply.raw.setHeader('X-Accel-Buffering', 'no');
-    reply.raw.flushHeaders?.();
-    reply.raw.write(`event: open\ndata: ${JSON.stringify({ runId })}\n\n`);
 
-    // 클라이언트가 늦게 붙은 경우를 위해 현재 DB 상태를 첫 이벤트로 보냄
+    // Fastify가 응답을 자동으로 닫지 않도록 hijack — 이후 reply.raw로만 쓴다
+    reply.hijack();
+    const res = reply.raw;
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`event: open\ndata: ${JSON.stringify({ runId })}\n\n`);
+
+    // 클라이언트가 늦게 붙은 경우를 위해 현재 DB 상태를 첫 이벤트로 보냄.
+    // agentVersion을 포함해야 클라이언트가 단계 정의를 알 수 있음.
     const snapshot = await prisma.run.findUnique({
       where: { id: runId },
-      include: { stageResults: { orderBy: { stageIndex: 'asc' } } },
+      include: {
+        stageResults: { orderBy: { stageIndex: 'asc' } },
+        agent: { select: { slug: true, name: true } },
+        agentVersion: true,
+      },
     });
     if (snapshot) {
-      reply.raw.write(
-        `event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`,
-      );
+      res.write(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`);
       if (
         snapshot.status === 'completed' ||
         snapshot.status === 'cancelled' ||
         snapshot.status === 'failed'
       ) {
-        reply.raw.write(
+        res.write(
           `event: ${snapshot.status}\ndata: ${JSON.stringify({ runId })}\n\n`,
         );
-        reply.raw.end();
+        res.end();
         return;
       }
     }
 
     const heartbeat = setInterval(() => {
-      reply.raw.write(`: ping\n\n`);
+      res.write(`: ping\n\n`);
     }, 15_000);
 
     const unsubscribe = runEvents.subscribe(runId, (ev) => {
-      reply.raw.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
+      res.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
       if (
         ev.type === 'run_completed' ||
         ev.type === 'run_cancelled' ||
@@ -115,7 +123,7 @@ export async function registerRunRoutes(app: FastifyInstance) {
       ) {
         clearInterval(heartbeat);
         unsubscribe();
-        reply.raw.end();
+        res.end();
       }
     });
 

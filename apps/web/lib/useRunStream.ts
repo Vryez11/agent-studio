@@ -137,6 +137,23 @@ export function useRunStream(runId: string | null): RunStreamHandle {
     error: null,
   });
 
+  // 마운트 직후 REST로 한 번 fetch — SSE snapshot이 늦거나 누락돼도 화면이 즉시 채워짐
+  useEffect(() => {
+    if (!runId) return;
+    let cancelled = false;
+    api
+      .getRun(runId)
+      .then((run) => {
+        if (!cancelled) dispatch({ type: 'snapshot', run });
+      })
+      .catch((err) => {
+        if (!cancelled) dispatch({ type: 'error', error: `initial fetch: ${String(err)}` });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [runId]);
+
   useEffect(() => {
     if (!runId) return;
     const es = new EventSource(`${API_BASE_URL}/runs/${runId}/stream`);
