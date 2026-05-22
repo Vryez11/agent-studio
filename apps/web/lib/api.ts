@@ -53,6 +53,11 @@ export type ApiAgentVersion = {
   createdAt: string;
 };
 
+export type ResolvedPrompt = {
+  system?: string;
+  user?: string;
+} | null;
+
 export type ApiStageResult = {
   id: string;
   runId: string;
@@ -61,6 +66,7 @@ export type ApiStageResult = {
   status: StageStatus;
   model: string | null;
   provider: string | null;
+  resolvedPrompt: ResolvedPrompt;
   outputText: string | null;
   outputStructured: unknown;
   inputTokens: number | null;

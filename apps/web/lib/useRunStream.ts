@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer } from 'react';
 import type { NormalizedEvent } from '@agent-studio/shared';
-import { API_BASE_URL, type ApiRun, type ApiStageResult } from './api';
+import { API_BASE_URL, api, type ApiRun, type ApiStageResult } from './api';
 
 export type RunStreamState = {
   run: ApiRun | null;
@@ -11,6 +11,11 @@ export type RunStreamState = {
   events: NormalizedEvent[];
   connected: boolean;
   error: string | null;
+};
+
+export type RunStreamHandle = RunStreamState & {
+  /** DB에서 run을 다시 가져와 snapshot으로 덮어쓰기 */
+  refresh: () => Promise<void>;
 };
 
 type Action =
@@ -74,6 +79,7 @@ function reducer(state: RunStreamState, action: Action): RunStreamState {
             status: 'completed',
             model: existing[idx]?.model ?? null,
             provider: existing[idx]?.provider ?? null,
+            resolvedPrompt: existing[idx]?.resolvedPrompt ?? null,
             outputText: event.outputText,
             outputStructured: event.outputStructured,
             inputTokens: event.usage.inputTokens,
@@ -122,7 +128,7 @@ function reducer(state: RunStreamState, action: Action): RunStreamState {
   }
 }
 
-export function useRunStream(runId: string | null): RunStreamState {
+export function useRunStream(runId: string | null): RunStreamHandle {
   const [state, dispatch] = useReducer(reducer, {
     run: null,
     liveText: {},
@@ -178,5 +184,32 @@ export function useRunStream(runId: string | null): RunStreamState {
     };
   }, [runId]);
 
-  return state;
+  const refresh = useCallback(async () => {
+    if (!runId) return;
+    try {
+      const fresh = await api.getRun(runId);
+      dispatch({ type: 'snapshot', run: fresh });
+    } catch (err) {
+      dispatch({ type: 'error', error: `refresh: ${String(err)}` });
+    }
+  }, [runId]);
+
+  // 종료 상태가 되면 한 번 자동 재페치 — DB에서 cost, resolvedPrompt,
+  // durationMs 같은 SSE에 없는 필드를 가져오기 위함
+  useEffect(() => {
+    if (!state.run) return;
+    if (
+      state.run.status === 'completed' ||
+      state.run.status === 'cancelled' ||
+      state.run.status === 'failed'
+    ) {
+      // 약간 지연 후 호출 — finalizeRun이 DB 커밋을 마치도록
+      const t = setTimeout(() => {
+        void refresh();
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [state.run?.status, refresh, state.run]);
+
+  return { ...state, refresh };
 }

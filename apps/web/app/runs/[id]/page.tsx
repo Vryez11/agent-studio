@@ -16,7 +16,7 @@ function fmtCost(usd: string | number | null) {
 
 export default function RunDetailPage() {
   const params = useParams<{ id: string }>();
-  const { run, liveText, connected, error } = useRunStream(params.id);
+  const { run, liveText, connected, error, refresh } = useRunStream(params.id);
   const [cancelling, setCancelling] = useState(false);
 
   async function handleCancel() {
@@ -59,6 +59,9 @@ export default function RunDetailPage() {
           {connected && isActive && (
             <span className="live-indicator">live</span>
           )}
+          <button className="btn" onClick={() => refresh()} title="DB에서 새로고침">
+            ↻
+          </button>
           {isActive && (
             <button
               className="btn danger"
