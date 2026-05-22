@@ -212,21 +212,19 @@ export function useRunStream(runId: string | null): RunStreamHandle {
   }, [runId]);
 
   // 종료 상태가 되면 한 번 자동 재페치 — DB에서 cost, resolvedPrompt,
-  // durationMs 같은 SSE에 없는 필드를 가져오기 위함
+  // durationMs 같은 SSE에 없는 필드를 가져오기 위함.
+  // 주의: 의존성에 state.run 전체를 넣으면 refresh가 새 객체로 state.run을
+  // 갱신할 때마다 effect가 또 발사되어 무한 루프가 됨. status만 의존.
+  const status = state.run?.status;
   useEffect(() => {
-    if (!state.run) return;
-    if (
-      state.run.status === 'completed' ||
-      state.run.status === 'cancelled' ||
-      state.run.status === 'failed'
-    ) {
-      // 약간 지연 후 호출 — finalizeRun이 DB 커밋을 마치도록
-      const t = setTimeout(() => {
-        void refresh();
-      }, 300);
-      return () => clearTimeout(t);
+    if (status !== 'completed' && status !== 'cancelled' && status !== 'failed') {
+      return;
     }
-  }, [state.run?.status, refresh, state.run]);
+    const t = setTimeout(() => {
+      void refresh();
+    }, 300);
+    return () => clearTimeout(t);
+  }, [status, refresh]);
 
   return { ...state, refresh };
 }
