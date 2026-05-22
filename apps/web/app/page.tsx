@@ -14,16 +14,22 @@ export default function Home() {
             정의된 에이전트 목록과 단계 구성 확인, 새 Run 시작.
           </p>
         </Link>
+        <Link
+          href="/agents/new"
+          className="card"
+          style={{ display: 'block' }}
+        >
+          <h3 style={{ marginBottom: '0.5rem' }}>새 에이전트 만들기</h3>
+          <p className="muted">
+            빌더에서 단계, 모델, 프롬프트를 정의해 새 에이전트 생성.
+          </p>
+        </Link>
         <Link href="/runs" className="card" style={{ display: 'block' }}>
           <h3 style={{ marginBottom: '0.5rem' }}>실행 히스토리</h3>
           <p className="muted">
             과거 Run의 단계별 결과, 토큰, 비용, 소요시간 조회.
           </p>
         </Link>
-        <div className="card" style={{ opacity: 0.5 }}>
-          <h3 style={{ marginBottom: '0.5rem' }}>빌더 (예정)</h3>
-          <p className="muted">웹에서 새 에이전트와 단계를 정의.</p>
-        </div>
       </div>
     </div>
   );

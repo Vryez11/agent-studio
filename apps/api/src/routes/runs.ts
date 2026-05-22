@@ -63,6 +63,17 @@ export async function registerRunRoutes(app: FastifyInstance) {
     });
   });
 
+  // 삭제 — stage_results / stage_events는 onDelete: Cascade로 함께 정리됨
+  app.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
+    // 진행 중이면 먼저 중단 시도 (memory에 controller가 있으면)
+    cancelRun(req.params.id);
+    const deleted = await prisma.run
+      .delete({ where: { id: req.params.id } })
+      .catch(() => null);
+    if (!deleted) return reply.code(404).send({ error: 'run_not_found' });
+    return { ok: true };
+  });
+
   // 중단
   app.post<{ Params: { id: string } }>('/:id/cancel', async (req, reply) => {
     const ok = cancelRun(req.params.id);

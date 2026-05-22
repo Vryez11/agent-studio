@@ -39,6 +39,22 @@ export default function AgentDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!agent) return;
+    const ok = window.confirm(
+      `정말 '${agent.name}' 에이전트를 삭제하시겠습니까?\n\n` +
+        `이 에이전트의 모든 버전과 실행 히스토리(Runs, 단계 결과 포함)가 함께 삭제됩니다.\n` +
+        `되돌릴 수 없습니다.`,
+    );
+    if (!ok) return;
+    try {
+      await api.deleteAgent(agent.slug);
+      router.push('/agents');
+    } catch (e) {
+      alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   if (error) return <p className="muted">에이전트를 불러올 수 없습니다: {error}</p>;
   if (!agent) return <p className="muted">로딩 중…</p>;
 
@@ -57,9 +73,14 @@ export default function AgentDetailPage() {
             {agent.currentVersion && ` · v${agent.currentVersion.version}`}
           </small>
         </h1>
-        <Link href={`/agents/${agent.slug}/edit`} className="btn">
-          편집
-        </Link>
+        <div className="row">
+          <Link href={`/agents/${agent.slug}/edit`} className="btn">
+            편집
+          </Link>
+          <button className="btn danger" onClick={handleDelete}>
+            삭제
+          </button>
+        </div>
       </div>
 
       {agent.description && (

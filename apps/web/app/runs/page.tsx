@@ -19,6 +19,7 @@ function fmtCost(usd: string | number) {
 export default function RunsPage() {
   const [runs, setRuns] = useState<ApiRun[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -26,6 +27,25 @@ export default function RunsPage() {
       .then(setRuns)
       .catch((e) => setError(String(e)));
   }, []);
+
+  async function handleDelete(run: ApiRun) {
+    const label = run.agent?.name ?? run.agentId;
+    const when = new Date(run.createdAt).toLocaleString();
+    const ok = window.confirm(
+      `이 Run을 삭제하시겠습니까?\n\n` +
+        `에이전트: ${label}\n생성: ${when}\n\n단계 결과와 이벤트도 함께 삭제되며 되돌릴 수 없습니다.`,
+    );
+    if (!ok) return;
+    setDeletingId(run.id);
+    try {
+      await api.deleteRun(run.id);
+      setRuns((prev) => (prev ? prev.filter((r) => r.id !== run.id) : prev));
+    } catch (e) {
+      alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   if (error) return <p className="muted">Runs을 불러올 수 없습니다: {error}</p>;
   if (!runs) return <p className="muted">로딩 중…</p>;
@@ -53,6 +73,7 @@ export default function RunsPage() {
                 <th style={{ textAlign: 'right' }}>출력</th>
                 <th style={{ textAlign: 'right' }}>비용</th>
                 <th></th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -75,6 +96,17 @@ export default function RunsPage() {
                   </td>
                   <td>
                     <Link href={`/runs/${r.id}`}>열기</Link>
+                  </td>
+                  <td>
+                    <button
+                      className="btn danger"
+                      style={{ padding: '0.25rem 0.5rem' }}
+                      onClick={() => handleDelete(r)}
+                      disabled={deletingId === r.id}
+                      title="삭제"
+                    >
+                      ×
+                    </button>
                   </td>
                 </tr>
               ))}

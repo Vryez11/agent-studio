@@ -30,6 +30,21 @@ export default function RunDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!run) return;
+    const ok = window.confirm(
+      `이 Run을 삭제하시겠습니까?\n\n` +
+        `단계 결과와 이벤트도 함께 삭제되며 되돌릴 수 없습니다.`,
+    );
+    if (!ok) return;
+    try {
+      await api.deleteRun(params.id);
+      window.location.href = '/runs';
+    } catch (e) {
+      alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   if (error) return <p className="muted">스트림 오류: {error}</p>;
   if (!run)
     return (
@@ -69,6 +84,11 @@ export default function RunDetailPage() {
               disabled={cancelling}
             >
               중단
+            </button>
+          )}
+          {!isActive && (
+            <button className="btn danger" onClick={handleDelete} title="Run 삭제">
+              삭제
             </button>
           )}
         </div>

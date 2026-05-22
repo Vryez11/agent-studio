@@ -133,6 +133,10 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+  deleteAgent: (slug: string) =>
+    request<{ ok: boolean }>(`/agents/${slug}`, { method: 'DELETE' }),
+  deleteRun: (id: string) =>
+    request<{ ok: boolean }>(`/runs/${id}`, { method: 'DELETE' }),
 };
 
 export const API_BASE_URL = API_BASE;

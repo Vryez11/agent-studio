@@ -58,6 +58,29 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     return reply.code(201).send(created);
   });
 
+  // 삭제 — 관련 runs (+ stage_results cascade), agent_versions까지 트랜잭션으로 일괄 삭제
+  app.delete<{ Params: { slug: string } }>('/:slug', async (req, reply) => {
+    const agent = await prisma.agent.findUnique({
+      where: { slug: req.params.slug },
+    });
+    if (!agent) return reply.code(404).send({ error: 'agent_not_found' });
+
+    await prisma.$transaction([
+      // runs 먼저 — stage_results는 onDelete: Cascade로 자동 정리됨
+      prisma.run.deleteMany({ where: { agentId: agent.id } }),
+      // currentVersionId의 FK 제약 해제 (agent_versions cascade 전에 unique 충돌 방지)
+      prisma.agent.update({
+        where: { id: agent.id },
+        data: { currentVersionId: null },
+      }),
+      // agent_versions는 agent 삭제 시 onDelete: Cascade로 자동 정리되지만,
+      // 명시적으로 먼저 지워두면 의존성이 분명해짐
+      prisma.agentVersion.deleteMany({ where: { agentId: agent.id } }),
+      prisma.agent.delete({ where: { id: agent.id } }),
+    ]);
+    return { ok: true };
+  });
+
   // 새 버전 발행 (definition 변경 시 새 row)
   app.put<{ Params: { slug: string } }>('/:slug', async (req, reply) => {
     const parsed = UpdateAgentBodySchema.safeParse(req.body);
