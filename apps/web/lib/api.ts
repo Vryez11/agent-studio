@@ -2,6 +2,7 @@ import type {
   RunStatus,
   StageStatus,
   StageDefinition,
+  AgentDefinition,
 } from '@agent-studio/shared';
 
 const API_BASE =
@@ -108,6 +109,24 @@ export const api = {
     }),
   cancelRun: (id: string) =>
     request<{ ok: boolean }>(`/runs/${id}/cancel`, { method: 'POST' }),
+  createAgent: (body: {
+    slug: string;
+    name: string;
+    description?: string;
+    definition: AgentDefinition;
+  }) =>
+    request<ApiAgent>('/agents', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateAgent: (
+    slug: string,
+    body: { name?: string; description?: string; definition: AgentDefinition },
+  ) =>
+    request<ApiAgent>(`/agents/${slug}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 };
 
 export const API_BASE_URL = API_BASE;

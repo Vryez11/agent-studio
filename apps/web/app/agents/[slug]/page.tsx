@@ -49,13 +49,18 @@ export default function AgentDetailPage() {
           ← Agents
         </Link>
       </div>
-      <h1 className="page-title">
-        {agent.name}
-        <small>
-          {agent.slug}
-          {agent.currentVersion && ` · v${agent.currentVersion.version}`}
-        </small>
-      </h1>
+      <div className="row between" style={{ marginBottom: '0.5rem' }}>
+        <h1 className="page-title" style={{ marginBottom: 0 }}>
+          {agent.name}
+          <small>
+            {agent.slug}
+            {agent.currentVersion && ` · v${agent.currentVersion.version}`}
+          </small>
+        </h1>
+        <Link href={`/agents/${agent.slug}/edit`} className="btn">
+          편집
+        </Link>
+      </div>
 
       {agent.description && (
         <p className="muted" style={{ marginBottom: '2rem' }}>

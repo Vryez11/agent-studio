@@ -20,9 +20,14 @@ export default function AgentsPage() {
 
   return (
     <div>
-      <h1 className="page-title">
-        Agents <small>{agents.length}개</small>
-      </h1>
+      <div className="row between" style={{ marginBottom: '1.5rem' }}>
+        <h1 className="page-title" style={{ marginBottom: 0 }}>
+          Agents <small>{agents.length}개</small>
+        </h1>
+        <Link href="/agents/new" className="btn primary">
+          + 새 에이전트
+        </Link>
+      </div>
 
       {agents.length === 0 ? (
         <div className="card">
