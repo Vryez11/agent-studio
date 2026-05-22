@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import {
   CreateAgentBodySchema,
   UpdateAgentBodySchema,
@@ -41,8 +42,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         data: {
           agentId: agent.id,
           version: 1,
-          stages: definition.stages as object,
-          contextSchema: (definition.contextSchema ?? null) as object | null,
+          stages: definition.stages as unknown as Prisma.InputJsonValue,
+          contextSchema:
+            (definition.contextSchema as Prisma.InputJsonValue | undefined) ??
+            Prisma.JsonNull,
         },
       });
       return tx.agent.update({
@@ -75,8 +78,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         data: {
           agentId: agent.id,
           version: nextVersion,
-          stages: parsed.data.definition.stages as object,
-          contextSchema: (parsed.data.definition.contextSchema ?? null) as object | null,
+          stages: parsed.data.definition.stages as unknown as Prisma.InputJsonValue,
+          contextSchema:
+            (parsed.data.definition.contextSchema as Prisma.InputJsonValue | undefined) ??
+            Prisma.JsonNull,
         },
       });
       return tx.agent.update({

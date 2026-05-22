@@ -1,19 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { StartRunBodySchema } from '@agent-studio/shared';
+import { runEvents } from '@agent-studio/runtime';
 import { prisma } from '../db.js';
-
-/**
- * 진행 중인 Run의 AbortController를 메모리에 보관.
- * (싱글 인스턴스 가정. 멀티 인스턴스로 가면 Redis 등으로 교체)
- */
-const runControllers = new Map<string, AbortController>();
+import { startRun, cancelRun } from '../services/orchestrator.js';
 
 export async function registerRunRoutes(app: FastifyInstance) {
-  // Run 시작 (실제 실행은 다음 단계에서 runtime executor 연결)
+  // Run 시작
   app.post('/', async (req, reply) => {
     const parsed = StartRunBodySchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'invalid_body', issues: parsed.error.issues });
+      return reply
+        .code(400)
+        .send({ error: 'invalid_body', issues: parsed.error.issues });
     }
     const agent = await prisma.agent.findUnique({
       where: { slug: parsed.data.agentSlug },
@@ -32,14 +30,15 @@ export async function registerRunRoutes(app: FastifyInstance) {
       },
     });
 
-    const controller = new AbortController();
-    runControllers.set(run.id, controller);
+    // 백그라운드 시작 — await하지 않음
+    startRun(run.id).catch((err) => {
+      req.log.error({ err, runId: run.id }, 'startRun failed');
+    });
 
-    // TODO: 다음 단계에서 runtime.executeRun(run, agent.currentVersion, controller.signal) 호출
-    return reply.code(202).send({ runId: run.id, status: run.status });
+    return reply.code(202).send({ runId: run.id, status: 'pending' });
   });
 
-  // Run 조회 (StageResult JOIN)
+  // Run 조회 (StageResult 포함)
   app.get<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const run = await prisma.run.findUnique({
       where: { id: req.params.id },
@@ -53,25 +52,76 @@ export async function registerRunRoutes(app: FastifyInstance) {
     return run;
   });
 
-  // Run 중단
+  // 목록
+  app.get('/', async (req) => {
+    const query = req.query as { agentId?: string; limit?: string };
+    return prisma.run.findMany({
+      where: query.agentId ? { agentId: query.agentId } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Number(query.limit ?? 50), 200),
+      include: { agent: { select: { slug: true, name: true } } },
+    });
+  });
+
+  // 중단
   app.post<{ Params: { id: string } }>('/:id/cancel', async (req, reply) => {
-    const controller = runControllers.get(req.params.id);
-    if (!controller) {
-      return reply.code(404).send({ error: 'run_not_active' });
-    }
-    controller.abort();
+    const ok = cancelRun(req.params.id);
+    if (!ok) return reply.code(404).send({ error: 'run_not_active' });
     return { ok: true };
   });
 
-  // SSE 스트림 (다음 단계에서 runtime의 EventEmitter 연결)
+  // SSE 스트림
   app.get<{ Params: { id: string } }>('/:id/stream', async (req, reply) => {
+    const runId = req.params.id;
     reply.raw.setHeader('Content-Type', 'text/event-stream');
-    reply.raw.setHeader('Cache-Control', 'no-cache');
+    reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
     reply.raw.setHeader('Connection', 'keep-alive');
-    reply.raw.write(`event: open\ndata: {"runId":"${req.params.id}"}\n\n`);
-    // TODO: runtime의 이벤트 버스 구독 후 reply.raw.write 로 푸시
+    reply.raw.setHeader('X-Accel-Buffering', 'no');
+    reply.raw.flushHeaders?.();
+    reply.raw.write(`event: open\ndata: ${JSON.stringify({ runId })}\n\n`);
+
+    // 클라이언트가 늦게 붙은 경우를 위해 현재 DB 상태를 첫 이벤트로 보냄
+    const snapshot = await prisma.run.findUnique({
+      where: { id: runId },
+      include: { stageResults: { orderBy: { stageIndex: 'asc' } } },
+    });
+    if (snapshot) {
+      reply.raw.write(
+        `event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`,
+      );
+      if (
+        snapshot.status === 'completed' ||
+        snapshot.status === 'cancelled' ||
+        snapshot.status === 'failed'
+      ) {
+        reply.raw.write(
+          `event: ${snapshot.status}\ndata: ${JSON.stringify({ runId })}\n\n`,
+        );
+        reply.raw.end();
+        return;
+      }
+    }
+
+    const heartbeat = setInterval(() => {
+      reply.raw.write(`: ping\n\n`);
+    }, 15_000);
+
+    const unsubscribe = runEvents.subscribe(runId, (ev) => {
+      reply.raw.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
+      if (
+        ev.type === 'run_completed' ||
+        ev.type === 'run_cancelled' ||
+        ev.type === 'run_failed'
+      ) {
+        clearInterval(heartbeat);
+        unsubscribe();
+        reply.raw.end();
+      }
+    });
+
     req.raw.on('close', () => {
-      reply.raw.end();
+      clearInterval(heartbeat);
+      unsubscribe();
     });
   });
 }
