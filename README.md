@@ -78,11 +78,3 @@ pnpm dev             # api + web 동시 실행
 
 - API: http://localhost:4000
 - Web: http://localhost:3000
-
-## 다음 단계
-
-1. Stage executor 구현 (런타임 엔진)
-2. Anthropic / OpenAI provider 구현 (스트리밍, 토큰 집계)
-3. Run 실행 API 엔드포인트 (SSE)
-4. Agent 빌더 UI
-5. Run 뷰어 UI
