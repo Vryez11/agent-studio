@@ -36,11 +36,33 @@ agent-studio/
 
 ```bash
 pnpm install
-cp .env.example .env
-# .env 의 DATABASE_URL, API 키들을 채우세요
+
+# API 환경변수 (DB 연결, LLM API 키)
+cp apps/api/.env.example apps/api/.env
+
+# 웹 환경변수 (API URL)
+cp apps/web/.env.example apps/web/.env.local
 ```
 
+`apps/api/.env`에는 최소 다음을 채워야 합니다:
+
+```env
+DATABASE_URL="mysql://USER:PASSWORD@localhost:3306/agent_studio"
+```
+
+> `.env`는 각 앱 디렉토리에 둡니다. Prisma는 `schema.prisma`와 같은 폴더의
+> `.env`를 자동 로드하고, API 서버도 `apps/api/`에서 실행되므로 위치가 일관됩니다.
+> Next.js는 `apps/web/`에서 `.env.local` 등을 자동 로드합니다.
+
 ### DB 마이그레이션
+
+먼저 MySQL에 데이터베이스를 생성:
+
+```sql
+CREATE DATABASE agent_studio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+이후:
 
 ```bash
 pnpm db:generate     # Prisma client 생성
