@@ -9,12 +9,15 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // body가 있을 때만 Content-Type 부여 — DELETE 등 body 없는 요청에 application/json을
+  // 붙이면 Fastify가 'empty JSON body'로 400 반환.
+  const headers: HeadersInit = { ...(init?.headers ?? {}) };
+  if (init?.body !== undefined && init?.body !== null) {
+    (headers as Record<string, string>)['Content-Type'] = 'application/json';
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers,
     cache: 'no-store',
   });
   if (!res.ok) {
