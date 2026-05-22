@@ -3,15 +3,29 @@
 import { useState } from 'react';
 import type { StageDefinition, Provider } from '@agent-studio/shared';
 
-const MODEL_OPTIONS: Record<Provider, string[]> = {
-  anthropic: [
-    'claude-opus-4-7',
-    'claude-opus-4-6',
-    'claude-sonnet-4-6',
-    'claude-haiku-4-5',
-  ],
-  openai: ['gpt-5', 'gpt-4o', 'gpt-4o-mini'],
+type ModelOption = {
+  id: string;
+  label: string;
+  /** USD per 1M tokens — "input · output" */
+  pricing: string;
+  tag?: string;
 };
+
+const MODEL_OPTIONS: Record<Provider, ModelOption[]> = {
+  anthropic: [
+    { id: 'claude-opus-4-7',   label: 'Claude Opus 4.7',   pricing: '$5 · $25',     tag: '최고급' },
+    { id: 'claude-opus-4-6',   label: 'Claude Opus 4.6',   pricing: '$5 · $25' },
+    { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', pricing: '$3 · $15',     tag: '균형' },
+    { id: 'claude-haiku-4-5',  label: 'Claude Haiku 4.5',  pricing: '$1 · $5',      tag: '저렴' },
+  ],
+  openai: [
+    { id: 'gpt-5',        label: 'GPT-5',        pricing: '$10 · $30' },
+    { id: 'gpt-4o',       label: 'GPT-4o',       pricing: '$2.5 · $10' },
+    { id: 'gpt-4o-mini',  label: 'GPT-4o mini',  pricing: '$0.15 · $0.6', tag: '저렴' },
+  ],
+};
+
+const CUSTOM_SENTINEL = '__custom__';
 
 const OUTPUT_FORMATS = ['text', 'tool_use', 'json_schema'] as const;
 
@@ -68,11 +82,16 @@ export function StageEditor({
 
   function handleProviderChange(provider: Provider) {
     const validModels = MODEL_OPTIONS[provider];
-    const nextModel = validModels.includes(stage.model)
+    const nextModel = validModels.some((m) => m.id === stage.model)
       ? stage.model
-      : validModels[0]!;
+      : validModels[0]!.id;
     onChange({ ...stage, provider, model: nextModel });
+    setCustomMode(false);
   }
+
+  const providerModels = MODEL_OPTIONS[stage.provider];
+  const isKnownModel = providerModels.some((m) => m.id === stage.model);
+  const [customMode, setCustomMode] = useState(!isKnownModel);
 
   return (
     <div className="card" style={{ marginBottom: '0.75rem' }}>
@@ -133,17 +152,46 @@ export function StageEditor({
         </div>
         <div>
           <label>Model</label>
-          <input
-            type="text"
-            list={`models-${stage.id}`}
-            value={stage.model}
-            onChange={(e) => patch({ model: e.target.value })}
-          />
-          <datalist id={`models-${stage.id}`}>
-            {MODEL_OPTIONS[stage.provider].map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
+          {customMode ? (
+            <div className="row" style={{ gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={stage.model}
+                onChange={(e) => patch({ model: e.target.value })}
+                placeholder="모델 ID 직접 입력"
+              />
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setCustomMode(false);
+                  patch({ model: providerModels[0]!.id });
+                }}
+                title="목록에서 선택"
+              >
+                목록
+              </button>
+            </div>
+          ) : (
+            <select
+              value={stage.model}
+              onChange={(e) => {
+                if (e.target.value === CUSTOM_SENTINEL) {
+                  setCustomMode(true);
+                } else {
+                  patch({ model: e.target.value });
+                }
+              }}
+            >
+              {providerModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                  {m.tag ? ` — ${m.tag}` : ''} ({m.pricing} / 1M)
+                </option>
+              ))}
+              <option value={CUSTOM_SENTINEL}>직접 입력…</option>
+            </select>
+          )}
         </div>
         <div>
           <label>onError</label>
