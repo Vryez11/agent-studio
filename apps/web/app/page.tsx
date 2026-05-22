@@ -1,19 +1,30 @@
+import Link from 'next/link';
+
 export default function Home() {
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Agent Studio</h1>
-      <p>다단계 LLM 에이전트를 정의·실행·모니터링하는 플랫폼.</p>
-      <ul>
-        <li>
-          <a href="/agents">에이전트 목록</a> (구현 예정)
-        </li>
-        <li>
-          <a href="/runs">실행 히스토리</a> (구현 예정)
-        </li>
-      </ul>
-      <p style={{ marginTop: '2rem', color: '#888', fontSize: '0.875rem' }}>
-        API: {process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}
+    <div>
+      <h1 className="page-title">Agent Studio</h1>
+      <p className="muted" style={{ marginBottom: '2rem' }}>
+        다단계 LLM 에이전트를 정의하고, 실행하고, 모니터링하세요.
       </p>
-    </main>
+      <div className="grid grid-cols-3">
+        <Link href="/agents" className="card" style={{ display: 'block' }}>
+          <h3 style={{ marginBottom: '0.5rem' }}>에이전트</h3>
+          <p className="muted">
+            정의된 에이전트 목록과 단계 구성 확인, 새 Run 시작.
+          </p>
+        </Link>
+        <Link href="/runs" className="card" style={{ display: 'block' }}>
+          <h3 style={{ marginBottom: '0.5rem' }}>실행 히스토리</h3>
+          <p className="muted">
+            과거 Run의 단계별 결과, 토큰, 비용, 소요시간 조회.
+          </p>
+        </Link>
+        <div className="card" style={{ opacity: 0.5 }}>
+          <h3 style={{ marginBottom: '0.5rem' }}>빌더 (예정)</h3>
+          <p className="muted">웹에서 새 에이전트와 단계를 정의.</p>
+        </div>
+      </div>
+    </div>
   );
 }
