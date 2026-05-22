@@ -1,6 +1,7 @@
 import type { ApiStageResult, ResolvedPrompt } from '@/lib/api';
 import type { StageDefinition } from '@agent-studio/shared';
 import { StatusBadge } from './StatusBadge';
+import { JsonView } from './JsonView';
 
 function fmtMs(ms: number | null) {
   if (ms == null) return '—';
@@ -142,7 +143,7 @@ export function StageCard({
             {structured !== undefined ? (
               <>
                 <div className="stage-section-label">Structured Output</div>
-                <pre className="stage-output">{JSON.stringify(structured, null, 2)}</pre>
+                <JsonView value={structured} />
                 {displayText && displayText.length > 0 && (
                   <>
                     <div
